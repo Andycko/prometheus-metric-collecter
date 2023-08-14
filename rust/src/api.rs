@@ -1,10 +1,15 @@
 use reqwest::blocking::Client;
 use reqwest::Url;
-use std::collections::HashMap;
+use serde::Deserialize;
 
 pub struct ApiClient {
     client: Client,
     base_url: Url,
+}
+
+#[derive(Deserialize)]
+pub struct Ip {
+    pub origin: String,
 }
 
 impl ApiClient {
@@ -22,7 +27,7 @@ impl ApiClient {
         }
     }
 
-    pub fn get_ip(&self) -> Result<HashMap<String, String>, reqwest::Error> {
+    pub fn get_ip(&self) -> Result<Ip, reqwest::Error> {
         println!("sending request");
         let url = match Url::join(&self.base_url, "ip") {
             Ok(t) => t,
@@ -30,7 +35,7 @@ impl ApiClient {
         };
 
         match self.client.get(url.as_str()).send() {
-            Ok(t) => Ok(t.json::<HashMap<String, String>>()?),
+            Ok(t) => Ok(t.json::<Ip>()?),
             Err(e) => Err(e),
         }
     }
