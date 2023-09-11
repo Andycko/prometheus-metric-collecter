@@ -15,7 +15,7 @@ provider "azurerm" {
 
 # Identities & roles
 resource "azurerm_user_assigned_identity" "metricscraper-ma" {
-  name                = "metricscraper-ma"
+  name                = "mvm-metric-scraper-ma"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
 }
@@ -48,27 +48,32 @@ resource "azurerm_storage_account" "sa" {
 
 resource "azurerm_container_registry" "cr" {
   location            = azurerm_resource_group.rg.location
-  name                = "healthdashboard-cr"
+  name                = "healthdashboardcr"
   resource_group_name = azurerm_resource_group.rg.name
   sku                 = ""
 }
 
+locals {
+    container_registry_hostname = "${azurerm_container_registry}.azurecr.io"
+    container_image_url = "${local.container_registry_hostname}/mvm-metric-scraper:latest"
+}
+
 resource "azurerm_log_analytics_workspace" "metricscraper-law" {
   location            = azurerm_resource_group.rg.location
-  name                = "metricscraper-law"
+  name                = "mvm-metric-scraper-law"
   resource_group_name = azurerm_resource_group.rg.name
 }
 
 resource "azurerm_container_app_environment" "metriscraper-cae" {
   location                   = azurerm_resource_group.rg.location
   log_analytics_workspace_id = azurerm_log_analytics_workspace.metricscraper-law.name
-  name                       = "metricscraper-cae"
+  name                       = "mvm-metric-scraper-cae"
   resource_group_name        = azurerm_resource_group.rg.name
 }
 
 resource "azurerm_container_app" "metricscraper-ca" {
   container_app_environment_id = azurerm_container_app_environment.metriscraper-cae.id
-  name                         = "metricscraper-ca"
+  name                         = "mvm-metric-scraper-ca"
   resource_group_name          = azurerm_resource_group.rg.name
   revision_mode                = "single"
   identity {
@@ -76,5 +81,23 @@ resource "azurerm_container_app" "metricscraper-ca" {
     identity_ids = [
       azurerm_user_assigned_identity.metricscraper-ma.id
     ]
+  }
+  registry {
+    server = local.container_registry_hostname
+    identity = azurerm_user_assigned_identity.metricscraper-ma.id
+  }
+   template {
+    revision_suffix = "latest"
+    min_replicas = 1
+    container {
+      name   = "mvm-metric-scraper"
+      image  = local.container_image_url
+      cpu    = 0.25
+      memory = "0.5Gi"
+      env {
+        name = "AZURE_CLIENT_ID"
+        VALUE = azurerm_user_assigned_identity.metricscraper-ma.id
+      }
+    }
   }
 }
